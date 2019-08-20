@@ -39,11 +39,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
 
-	chk "go-kcl/checkpoint"
-	"github.com/vmware/vmware-go-kcl/clientlibrary/config"
-	kcl "github.com/vmware/vmware-go-kcl/clientlibrary/interfaces"
-	"github.com/vmware/vmware-go-kcl/clientlibrary/metrics"
-	par "github.com/vmware/vmware-go-kcl/clientlibrary/partition"
+	chk "github.com/guygma/go-kcl/checkpoint"
+	"github.com/guygma/go-kcl/config"
+	kcl "github.com/guygma/go-kcl/interfaces"
+	"github.com/guygma/go-kcl/metrics"
+	par "github.com/guygma/go-kcl/partition"
 )
 
 /**
