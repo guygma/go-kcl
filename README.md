@@ -4,7 +4,7 @@
 
 [Amazon Kinesis](https://aws.amazon.com/kinesis/data-streams/)  enables real-time processing of streaming data at massive scale. Kinesis Streams is useful for rapidly moving data off data producers and then continuously processing the data, be it to transform the data before emitting to a data store, run real-time metrics and analytics, or derive more complex data streams for further processing.
 
-The **Kinesis Client Library** (started by VMWare) enables Go developers to easily consume and process data from [Amazon Kinesis][kinesis]. goKCL has the same API and functional spec of the [Java KCL v2.0](https://docs.aws.amazon.com/streams/latest/dev/kcl-migration.html) without the resource overhead of installing Java based MultiLangDaemon.
+The **Kinesis Client Library for Go** (goKCL) enables Go developers to easily consume and process data from [Amazon Kinesis][kinesis]. goKCL has the same API and functional spec of the [Java KCL v2.0](https://docs.aws.amazon.com/streams/latest/dev/kcl-migration.html) without the resource overhead of installing Java based MultiLangDaemon.
 
 ## Try it out
 
