@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	deagg "github.com/awslabs/kinesis-aggregation/go/deaggregator"
-	rec "github.com/awslabs/kinesis-aggregation/go/records"	
+	rec "github.com/awslabs/kinesis-aggregation/go/record"
 )
 
 // Generate an aggregate record in the correct AWS-specified format
@@ -119,7 +119,7 @@ func TestNonMatchingMagicHeaderReturnsSingleRecord(t *testing.T) {
 }
 
 // This function tests that the DeaggregateRecords function returns the correct number of
-// deaggregated records from a single aggregated record.
+// deaggregated record from a single aggregated record.
 func TestVariableLengthRecordsReturnsCorrectNumberOfDeaggregatedRecords(t *testing.T) {
 	var err error
 	var kr *kinesis.Record
@@ -139,7 +139,7 @@ func TestVariableLengthRecordsReturnsCorrectNumberOfDeaggregatedRecords(t *testi
 		panic(err)
 	}
 
-	// Variable Length Aggregate Record test has aggregaterd records and should return
+	// Variable Length Aggregate Record test has aggregaterd record and should return
 	// n length.
 	assertMsg := fmt.Sprintf("Variable Length Aggregate Record should return length %v.", len(dars))
 	assert.Equal(t, n, len(dars), assertMsg)

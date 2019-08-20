@@ -1,8 +1,12 @@
-package common
+package util
 
 import (
 	"fmt"
+	"github.com/awslabs/kinesis-aggregation/go/record"
 	"net/http"
+
+	"github.com/aws/aws-sdk-go/aws"
+	ks "github.com/aws/aws-sdk-go/service/kinesis"
 )
 
 // ErrorCode is unified definition of numerical error codes
@@ -144,4 +148,55 @@ func (e *ClientLibraryError) WithCause(err error) *ClientLibraryError {
 		}
 	}
 	return e
+}
+
+const (
+	/**
+	 * Indicates that the entire application is being shutdown, and if desired the record processor will be given a
+	 * final chance to checkpoint. This state will not trigger a direct call to
+	 * {@link com.amazonaws.services.kinesis.clientlibrary.interfaces.v2.IRecordProcessor#shutdown(ShutdownInput)}, but
+	 * instead depend on a different interface for backward compatibility.
+	 */
+	REQUESTED ShutdownReason = iota + 1
+	/**
+	 * Terminate processing for this RecordProcessor (resharding use case).
+	 * Indicates that the shard is closed and all record from the shard have been delivered to the application.
+	 * Applications SHOULD checkpoint their progress to indicate that they have successfully processed all record
+	 * from this shard and processing of child shards can be started.
+	 */
+	TERMINATE
+	/**
+	 * Processing will be moved to a different record processor (fail over, load balancing use cases).
+	 * Applications SHOULD NOT checkpoint their progress (as another record processor may have already started
+	 * processing data).
+	 */
+	ZOMBIE
+)
+
+// Containers for the parameters to the IRecordProcessor
+type (
+	/**
+	 * Reason the RecordProcessor is being shutdown.
+	 * Used to distinguish between a fail-over vs. a termination (shard is closed and all record have been delivered).
+	 * In case of a fail over, applications should NOT checkpoint as part of shutdown,
+	 * since another record processor may have already started processing record for that shard.
+	 * In case of termination (resharding use case), applications SHOULD checkpoint their progress to indicate
+	 * that they have successfully processed all the record (processing of child shards can then begin).
+	 */
+	ShutdownReason int
+
+	ShutdownInput struct {
+		ShutdownReason ShutdownReason
+		Checkpointer   record.IRecordProcessorCheckpointer
+	}
+)
+
+var shutdownReasonMap = map[ShutdownReason]*string{
+	REQUESTED: aws.String("REQUESTED"),
+	TERMINATE: aws.String("TERMINATE"),
+	ZOMBIE:    aws.String("ZOMBIE"),
+}
+
+func ShutdownReasonMessage(reason ShutdownReason) *string {
+	return shutdownReasonMap[reason]
 }

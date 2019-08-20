@@ -2,6 +2,7 @@ package goKCL
 
 import (
 	"errors"
+	"github.com/awslabs/kinesis-aggregation/go/shard"
 	"sync"
 	"time"
 
@@ -183,8 +184,8 @@ func (w *Worker) initialize() error {
 }
 
 // newShardConsumer to create a shard consumer instance
-func (w *Worker) newShardConsumer(shard *par.ShardStatus) *ShardConsumer {
-	return &ShardConsumer{
+func (w *Worker) newShardConsumer(shard *par.ShardStatus) *shard.ShardConsumer {
+	return &shard.ShardConsumer{
 		streamName:      w.streamName,
 		shard:           shard,
 		kc:              w.kc,
@@ -195,7 +196,7 @@ func (w *Worker) newShardConsumer(shard *par.ShardStatus) *ShardConsumer {
 		stop:            w.stop,
 		waitGroup:       w.waitGroup,
 		mService:        w.mService,
-		state:           WAITING_ON_PARENT_SHARDS,
+		state:           shard.WAITING_ON_PARENT_SHARDS,
 	}
 }
 
@@ -237,7 +238,7 @@ func (w *Worker) eventLoop() {
 					}
 				}
 
-				// The shard is closed and we have processed all records
+				// The shard is closed and we have processed all record
 				if shard.Checkpoint == chk.SHARD_END {
 					continue
 				}

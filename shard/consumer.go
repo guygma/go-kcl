@@ -1,4 +1,4 @@
-package worker
+package shard
 
 import (
 	log "github.com/sirupsen/logrus"
@@ -40,9 +40,50 @@ const (
 	ErrCodeKMSThrottlingException = "KMSThrottlingException"
 )
 
+// ExtendedSequenceNumber represents a two-part sequence number for record aggregated by the Kinesis Producer Library.
+//
+// The KPL combines multiple user record into a single Kinesis record. Each user record therefore has an integer
+// sub-sequence number, in addition to the regular sequence number of the Kinesis record. The sub-sequence number
+// is used to checkpoint within an aggregated record.
+type ExtendedSequenceNumber struct {
+	SequenceNumber    *string
+	SubSequenceNumber int64
+}
+
+type InitializationInput struct {
+	ShardId                         string
+	ExtendedSequenceNumber          *ExtendedSequenceNumber
+	PendingCheckpointSequenceNumber *ExtendedSequenceNumber
+}
+
+type ShardStatus struct {
+	ID            string
+	ParentShardId string
+	Checkpoint    string
+	AssignedTo    string
+	Mux           *sync.Mutex
+	LeaseTimeout  time.Time
+	// Shard Range
+	StartingSequenceNumber string
+	// child shard doesn't have end sequence number
+	EndingSequenceNumber string
+}
+
+func (ss *ShardStatus) GetLeaseOwner() string {
+	ss.Mux.Lock()
+	defer ss.Mux.Unlock()
+	return ss.AssignedTo
+}
+
+func (ss *ShardStatus) SetLeaseOwner(owner string) {
+	ss.Mux.Lock()
+	defer ss.Mux.Unlock()
+	ss.AssignedTo = owner
+}
+
 type ShardConsumerState int
 
-// ShardConsumer is responsible for consuming data records of a (specified) shard.
+// ShardConsumer is responsible for consuming data record of a (specified) shard.
 // Note: ShardConsumer only deal with one shard.
 type ShardConsumer struct {
 	streamName      string
@@ -149,12 +190,12 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 			Limit:         aws.Int64(int64(sc.kclConfig.MaxRecords)),
 			ShardIterator: shardIterator,
 		}
-		// Get records from stream and retry as needed
+		// Get record from stream and retry as needed
 		getResp, err := sc.kc.GetRecords(getRecordsArgs)
 		if err != nil {
 			if awsErr, ok := err.(awserr.Error); ok {
 				if awsErr.Code() == kinesis.ErrCodeProvisionedThroughputExceededException || awsErr.Code() == ErrCodeKMSThrottlingException {
-					log.Errorf("Error getting records from shard %v: %+v", shard.ID, err)
+					log.Errorf("Error getting record from shard %v: %+v", shard.ID, err)
 					retriedErrors++
 					// exponential backoff
 					// https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Programming.Errors.html#Programming.Errors.RetryAndBackoff
@@ -162,7 +203,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 					continue
 				}
 			}
-			log.Errorf("Error getting records from Kinesis that cannot be retried: %+v Request: %s", err, getRecordsArgs)
+			log.Errorf("Error getting record from Kinesis that cannot be retried: %+v Request: %s", err, getRecordsArgs)
 			return err
 		}
 
@@ -178,7 +219,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 
 		recordLength := len(input.Records)
 		recordBytes := int64(0)
-		log.Debugf("Received %d records, MillisBehindLatest: %v", recordLength, input.MillisBehindLatest)
+		log.Debugf("Received %d record, MillisBehindLatest: %v", recordLength, input.MillisBehindLatest)
 
 		for _, r := range getResp.Records {
 			recordBytes += int64(len(r.Data))
@@ -204,13 +245,13 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 		sc.mService.RecordGetRecordsTime(shard.ID, float64(getRecordsTime))
 
 		// Idle between each read, the user is responsible for checkpoint the progress
-		// This value is only used when no records are returned; if records are returned, it should immediately
-		// retrieve the next set of records.
+		// This value is only used when no record are returned; if record are returned, it should immediately
+		// retrieve the next set of record.
 		if recordLength == 0 && aws.Int64Value(getResp.MillisBehindLatest) < int64(sc.kclConfig.IdleTimeBetweenReadsInMillis) {
 			time.Sleep(time.Duration(sc.kclConfig.IdleTimeBetweenReadsInMillis) * time.Millisecond)
 		}
 
-		// The shard has been closed, so no new records can be read from it
+		// The shard has been closed, so no new record can be read from it
 		if getResp.NextShardIterator == nil {
 			log.Infof("Shard %s closed", shard.ID)
 			shutdownInput := &kcl.ShutdownInput{ShutdownReason: kcl.TERMINATE, Checkpointer: recordCheckpointer}

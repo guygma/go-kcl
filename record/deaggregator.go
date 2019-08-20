@@ -1,4 +1,4 @@
-package goKCL
+package record
 
 import (
 	"crypto/md5"
@@ -6,8 +6,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/golang/protobuf/proto"
-
-	rec "github.com/awslabs/kinesis-aggregation/go/records"
 )
 
 // Magic File Header for a KPL Aggregated Record
@@ -18,8 +16,8 @@ const (
 	DigestSize  = 16 // MD5 Message size for protobuf.
 )
 
-// DeaggregateRecords takes an array of Kinesis records and expands any Protobuf
-// records within that array, returning an array of all records
+// DeaggregateRecords takes an array of Kinesis record and expands any Protobuf
+// record within that array, returning an array of all record
 func DeaggregateRecords(records []*kinesis.Record) ([]*kinesis.Record, error) {
 	var isAggregated bool
 	allRecords := make([]*kinesis.Record, 0)
@@ -79,14 +77,14 @@ func DeaggregateRecords(records []*kinesis.Record) ([]*kinesis.Record, error) {
 // createUserRecord takes in the partitionKeys of the aggregated record, the individual
 // deaggregated record, and the original aggregated record builds a kinesis.Record and
 // returns it
-func createUserRecord(partitionKeys []string, aggRec *rec.Record, record *kinesis.Record) (*kinesis.Record) {
+func createUserRecord(partitionKeys []string, aggRec *rec.Record, record *kinesis.Record) *kinesis.Record {
 	partitionKey := partitionKeys[*aggRec.PartitionKeyIndex]
 
 	return &kinesis.Record{
 		ApproximateArrivalTimestamp: record.ApproximateArrivalTimestamp,
-		Data: aggRec.Data,
-		EncryptionType: record.EncryptionType,
-		PartitionKey: &partitionKey,
-		SequenceNumber: record.SequenceNumber,
+		Data:                        aggRec.Data,
+		EncryptionType:              record.EncryptionType,
+		PartitionKey:                &partitionKey,
+		SequenceNumber:              record.SequenceNumber,
 	}
 }
