@@ -39,8 +39,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/guygma/go-kcl/config"
-	par "github.com/guygma/go-kcl/partition"
+	"github.com/guygma/goKCL/config"
+	par "github.com/guygma/goKCL/partition"
 )
 
 const (

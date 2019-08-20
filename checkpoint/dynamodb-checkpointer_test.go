@@ -39,8 +39,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 
-	cfg "github.com/guygma/go-kcl/config"
-	par "github.com/guygma/go-kcl/partition"
+	cfg "github.com/guygma/goKCL/config"
+	par "github.com/guygma/goKCL/partition"
 )
 
 func TestDoesTableExist(t *testing.T) {

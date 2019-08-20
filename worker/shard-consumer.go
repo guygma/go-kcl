@@ -38,11 +38,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
 
-	chk "github.com/guygma/go-kcl/checkpoint"
-	"github.com/guygma/go-kcl/config"
-	kcl "github.com/guygma/go-kcl/interfaces"
-	"github.com/guygma/go-kcl/metrics"
-	par "github.com/guygma/go-kcl/partition"
+	chk "github.com/guygma/goKCL/checkpoint"
+	"github.com/guygma/goKCL/config"
+	kcl "github.com/guygma/goKCL/interfaces"
+	"github.com/guygma/goKCL/metrics"
+	par "github.com/guygma/goKCL/partition"
 )
 
 const (

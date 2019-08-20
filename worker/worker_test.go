@@ -34,11 +34,11 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/assert"
-	cfg "github.com/guygma/go-kcl/config"
-	kc "github.com/guygma/go-kcl/interfaces"
-	"github.com/guygma/go-kcl/metrics"
-	"github.com/guygma/go-kcl/utils"
-	wk "github.com/guygma/go-kcl/worker"
+	cfg "github.com/guygma/goKCL/config"
+	kc "github.com/guygma/goKCL/interfaces"
+	"github.com/guygma/goKCL/metrics"
+	"github.com/guygma/goKCL/utils"
+	wk "github.com/guygma/goKCL/worker"
 )
 
 const (

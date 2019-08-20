@@ -21,9 +21,9 @@ package worker
 import (
 	"github.com/aws/aws-sdk-go/aws"
 
-	chk "github.com/guygma/go-kcl/checkpoint"
-	kcl "github.com/guygma/go-kcl/interfaces"
-	par "github.com/guygma/go-kcl/partition"
+	chk "github.com/guygma/goKCL/checkpoint"
+	kcl "github.com/guygma/goKCL/interfaces"
+	par "github.com/guygma/goKCL/partition"
 )
 
 type (

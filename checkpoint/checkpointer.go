@@ -29,7 +29,7 @@ package checkpoint
 
 import (
 	"errors"
-	par "github.com/guygma/go-kcl/partition"
+	par "github.com/guygma/goKCL/partition"
 )
 
 const (
