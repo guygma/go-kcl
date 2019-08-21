@@ -50,7 +50,7 @@ func DeaggregateRecords(records []*kinesis.Record) ([]*kinesis.Record, error) {
 			if messageDigest != calculatedDigest {
 				isAggregated = false
 			} else {
-				aggRecord := &rec.AggregatedRecord{}
+				aggRecord := &AggregatedRecord{}
 				err := proto.Unmarshal(messageData, aggRecord)
 
 				if err != nil {
@@ -77,14 +77,14 @@ func DeaggregateRecords(records []*kinesis.Record) ([]*kinesis.Record, error) {
 // createUserRecord takes in the partitionKeys of the aggregated record, the individual
 // deaggregated record, and the original aggregated record builds a kinesis.Record and
 // returns it
-func createUserRecord(partitionKeys []string, aggRec *rec.Record, record *kinesis.Record) *kinesis.Record {
-	partitionKey := partitionKeys[*aggRec.PartitionKeyIndex]
+func createUserRecord(partitionKeys []string, arecord *Record, krecord *kinesis.Record) *kinesis.Record {
+	partitionKey := partitionKeys[*arecord.PartitionKeyIndex]
 
 	return &kinesis.Record{
-		ApproximateArrivalTimestamp: record.ApproximateArrivalTimestamp,
-		Data:                        aggRec.Data,
-		EncryptionType:              record.EncryptionType,
+		ApproximateArrivalTimestamp: krecord.ApproximateArrivalTimestamp,
+		Data:                        arecord.Data,
+		EncryptionType:              krecord.EncryptionType,
 		PartitionKey:                &partitionKey,
-		SequenceNumber:              record.SequenceNumber,
+		SequenceNumber:              krecord.SequenceNumber,
 	}
 }

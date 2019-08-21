@@ -2,7 +2,7 @@ package shard
 
 import (
 	"errors"
-	par "github.com/guygma/goKCL/partition"
+	"github.com/guygma/goKCL"
 	"log"
 	"time"
 
@@ -14,9 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/guygma/goKCL/config"
-	par "github.com/guygma/goKCL/partition"
 )
 
 const (
@@ -47,12 +44,12 @@ type DynamoCheckpoint struct {
 
 	LeaseDuration  int
 	svc            dynamodbiface.DynamoDBAPI
-	kclConfig      *config.KinesisClientLibConfiguration
+	kclConfig      *goKCL.KinesisClientLibConfiguration
 	Retries        int
 	skipTableCheck bool
 }
 
-func NewDynamoCheckpoint(kclConfig *config.KinesisClientLibConfiguration) *DynamoCheckpoint {
+func NewDynamoCheckpoint(kclConfig *goKCL.KinesisClientLibConfiguration) *DynamoCheckpoint {
 	checkpointer := &DynamoCheckpoint{
 		TableName:               kclConfig.TableName,
 		leaseTableReadCapacity:  int64(kclConfig.InitialLeaseTableReadCapacity),
@@ -73,7 +70,7 @@ func (checkpointer *DynamoCheckpoint) WithDynamoDB(svc dynamodbiface.DynamoDBAPI
 
 // Init initialises the DynamoDB Checkpoint
 func (checkpointer *DynamoCheckpoint) Init() error {
-	log.Info("Creating DynamoDB session")
+	logrus.Info("Creating DynamoDB session")
 
 	s, err := session.NewSession(&aws.Config{
 		Region:      aws.String(checkpointer.kclConfig.RegionName),
@@ -98,7 +95,7 @@ func (checkpointer *DynamoCheckpoint) Init() error {
 }
 
 // GetLease attempts to gain a lock on the given shard
-func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssignTo string) error {
+func (checkpointer *DynamoCheckpoint) GetLease(shard *Status, newAssignTo string) error {
 	newLeaseTimeout := time.Now().Add(time.Duration(checkpointer.LeaseDuration) * time.Millisecond).UTC()
 	newLeaseTimeoutString := newLeaseTimeout.Format(time.RFC3339)
 	currentCheckpoint, err := checkpointer.getItem(shard.ID)
@@ -126,7 +123,7 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 			return errors.New(ErrLeaseNotAquired)
 		}
 
-		log.Debugf("Attempting to get a lock for shard: %s, leaseTimeout: %s, assignedTo: %s", shard.ID, currentLeaseTimeout, assignedTo)
+		logrus.Debugf("Attempting to get a lock for shard: %s, leaseTimeout: %s, assignedTo: %s", shard.ID, currentLeaseTimeout, assignedTo)
 		conditionalExpression = "ShardID = :id AND AssignedTo = :assigned_to AND LeaseTimeout = :lease_timeout"
 		expressionAttributeValues = map[string]*dynamodb.AttributeValue{
 			":id": {
@@ -182,7 +179,7 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 }
 
 // CheckpointSequence writes a checkpoint at the designated sequence ID
-func (checkpointer *DynamoCheckpoint) CheckpointSequence(shard *par.ShardStatus) error {
+func (checkpointer *DynamoCheckpoint) CheckpointSequence(shard *Status) error {
 	leaseTimeout := shard.LeaseTimeout.UTC().Format(time.RFC3339)
 	marshalledCheckpoint := map[string]*dynamodb.AttributeValue{
 		LEASE_KEY_KEY: {
@@ -207,7 +204,7 @@ func (checkpointer *DynamoCheckpoint) CheckpointSequence(shard *par.ShardStatus)
 }
 
 // FetchCheckpoint retrieves the checkpoint for the given shard
-func (checkpointer *DynamoCheckpoint) FetchCheckpoint(shard *par.ShardStatus) error {
+func (checkpointer *DynamoCheckpoint) FetchCheckpoint(shard *Status) error {
 	checkpoint, err := checkpointer.getItem(shard.ID)
 	if err != nil {
 		return err
@@ -217,7 +214,7 @@ func (checkpointer *DynamoCheckpoint) FetchCheckpoint(shard *par.ShardStatus) er
 	if !ok {
 		return ErrSequenceIDNotFound
 	}
-	log.Debugf("Retrieved Shard Iterator %s", *sequenceID.S)
+	logrus.Debugf("Retrieved Shard Iterator %s", *sequenceID.S)
 	shard.Mux.Lock()
 	defer shard.Mux.Unlock()
 	shard.Checkpoint = aws.StringValue(sequenceID.S)
@@ -233,9 +230,9 @@ func (checkpointer *DynamoCheckpoint) RemoveLeaseInfo(shardID string) error {
 	err := checkpointer.removeItem(shardID)
 
 	if err != nil {
-		log.Errorf("Error in removing lease info for shard: %s, Error: %+v", shardID, err)
+		logrus.Errorf("Error in removing lease info for shard: %s, Error: %+v", shardID, err)
 	} else {
-		log.Infof("Lease info for shard: %s has been removed.", shardID)
+		logrus.Infof("Lease info for shard: %s has been removed.", shardID)
 	}
 
 	return err
@@ -341,13 +338,13 @@ type Checkpointer interface {
 	Init() error
 
 	// GetLease attempts to gain a lock on the given shard
-	GetLease(*par.ShardStatus, string) error
+	GetLease(*Status, string) error
 
 	// CheckpointSequence writes a checkpoint at the designated sequence ID
-	CheckpointSequence(*par.ShardStatus) error
+	CheckpointSequence(*Status) error
 
 	// FetchCheckpoint retrieves the checkpoint for the given shard
-	FetchCheckpoint(*par.ShardStatus) error
+	FetchCheckpoint(*Status) error
 
 	// RemoveLeaseInfo to remove lease info for shard entry because the shard no longer exists
 	RemoveLeaseInfo(string) error

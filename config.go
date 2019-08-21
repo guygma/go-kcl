@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/aws/aws-sdk-go/aws"
-	creds "github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/guygma/goKCL/utils"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 )
 
 const (
@@ -101,131 +102,129 @@ const (
 	DEFAULT_MAX_LIST_SHARDS_RETRY_ATTEMPTS = 50
 )
 
-type (
-	// InitialPositionInStream Used to specify the Position in the stream where a new application should start from
-	// This is used during initial application bootstrap (when a checkpoint doesn't exist for a shard or its parents)
-	InitialPositionInStream int
+// InitialPositionInStream Used to specify the Position in the stream where a new application should start from
+// This is used during initial application bootstrap (when a checkpoint doesn't exist for a shard or its parents)
+type InitialPositionInStream int
 
-	// Class that houses the entities needed to specify the Position in the stream from where a new application should
-	// start.
-	InitialPositionInStreamExtended struct {
-		Position InitialPositionInStream
+// Class that houses the entities needed to specify the Position in the stream from where a new application should
+// start.
+type InitialPositionInStreamExtended struct {
+	Position InitialPositionInStream
 
-		// The time stamp of the data record from which to start reading. Used with
-		// shard iterator type AT_TIMESTAMP. A time stamp is the Unix epoch date with
-		// precision in milliseconds. For example, 2016-04-04T19:58:46.480-00:00 or
-		// 1459799926.480. If a record with this exact time stamp does not exist, the
-		// iterator returned is for the next (later) record. If the time stamp is older
-		// than the current trim horizon, the iterator returned is for the oldest untrimmed
-		// data record (TRIM_HORIZON).
-		Timestamp *time.Time `type:"Timestamp" timestampFormat:"unix"`
-	}
+	// The time stamp of the data record from which to start reading. Used with
+	// shard iterator type AT_TIMESTAMP. A time stamp is the Unix epoch date with
+	// precision in milliseconds. For example, 2016-04-04T19:58:46.480-00:00 or
+	// 1459799926.480. If a record with this exact time stamp does not exist, the
+	// iterator returned is for the next (later) record. If the time stamp is older
+	// than the current trim horizon, the iterator returned is for the oldest untrimmed
+	// data record (TRIM_HORIZON).
+	Timestamp *time.Time `type:"Timestamp" timestampFormat:"unix"`
+}
 
-	// Configuration for the Kinesis Client Library.
-	// Note: There is no need to configure credential provider. Credential can be get from InstanceProfile.
-	KinesisClientLibConfiguration struct {
-		// ApplicationName is name of application. Kinesis allows multiple applications to consume the same stream.
-		ApplicationName string
+// Configuration for the Kinesis Client Library.
+// Note: There is no need to configure credential provider. Credential can be get from InstanceProfile.
+type KinesisClientLibConfiguration struct {
+	// ApplicationName is name of application. Kinesis allows multiple applications to consume the same stream.
+	ApplicationName string
 
-		// DynamoDBEndpoint is an optional endpoint URL that overrides the default generated endpoint for a DynamoDB client.
-		// If this is empty, the default generated endpoint will be used.
-		DynamoDBEndpoint string
+	// DynamoDBEndpoint is an optional endpoint URL that overrides the default generated endpoint for a DynamoDB client.
+	// If this is empty, the default generated endpoint will be used.
+	DynamoDBEndpoint string
 
-		// KinesisEndpoint is an optional endpoint URL that overrides the default generated endpoint for a Kinesis client.
-		// If this is empty, the default generated endpoint will be used.
-		KinesisEndpoint string
+	// KinesisEndpoint is an optional endpoint URL that overrides the default generated endpoint for a Kinesis client.
+	// If this is empty, the default generated endpoint will be used.
+	KinesisEndpoint string
 
-		// KinesisCredentials is used to access Kinesis
-		KinesisCredentials *creds.Credentials
+	// KinesisCredentials is used to access Kinesis
+	KinesisCredentials *credentials.Credentials
 
-		// DynamoDBCredentials is used to access DynamoDB
-		DynamoDBCredentials *creds.Credentials
+	// DynamoDBCredentials is used to access DynamoDB
+	DynamoDBCredentials *credentials.Credentials
 
-		// CloudWatchCredentials is used to access CloudWatch
-		CloudWatchCredentials *creds.Credentials
+	// CloudWatchCredentials is used to access CloudWatch
+	CloudWatchCredentials *credentials.Credentials
 
-		// TableName is name of the dynamo db table for managing kinesis stream default to ApplicationName
-		TableName string
+	// TableName is name of the dynamo db table for managing kinesis stream default to ApplicationName
+	TableName string
 
-		// StreamName is the name of Kinesis stream
-		StreamName string
+	// StreamName is the name of Kinesis stream
+	StreamName string
 
-		// WorkerID used to distinguish different workers/processes of a Kinesis application
-		WorkerID string
+	// WorkerID used to distinguish different workers/processes of a Kinesis application
+	WorkerID string
 
-		// InitialPositionInStream specifies the Position in the stream where a new application should start from
-		InitialPositionInStream InitialPositionInStream
+	// InitialPositionInStream specifies the Position in the stream where a new application should start from
+	InitialPositionInStream InitialPositionInStream
 
-		// InitialPositionInStreamExtended provides actual AT_TMESTAMP value
-		InitialPositionInStreamExtended InitialPositionInStreamExtended
+	// InitialPositionInStreamExtended provides actual AT_TMESTAMP value
+	InitialPositionInStreamExtended InitialPositionInStreamExtended
 
-		// credentials to access Kinesis/Dynamo/CloudWatch: https://docs.aws.amazon.com/sdk-for-go/api/aws/credentials/
-		// Note: No need to configure here. Use NewEnvCredentials for testing and EC2RoleProvider for production
+	// credentials to access Kinesis/Dynamo/CloudWatch: https://docs.aws.amazon.com/sdk-for-go/api/aws/credentials/
+	// Note: No need to configure here. Use NewEnvCredentials for testing and EC2RoleProvider for production
 
-		// FailoverTimeMillis Lease duration (leases not renewed within this period will be claimed by others)
-		FailoverTimeMillis int
+	// FailoverTimeMillis Lease duration (leases not renewed within this period will be claimed by others)
+	FailoverTimeMillis int
 
-		/// MaxRecords Max record to read per Kinesis getRecords() call
-		MaxRecords int
+	/// MaxRecords Max record to read per Kinesis getRecords() call
+	MaxRecords int
 
-		// IdleTimeBetweenReadsInMillis Idle time between calls to fetch data from Kinesis
-		IdleTimeBetweenReadsInMillis int
+	// IdleTimeBetweenReadsInMillis Idle time between calls to fetch data from Kinesis
+	IdleTimeBetweenReadsInMillis int
 
-		// CallProcessRecordsEvenForEmptyRecordList Call the IRecordProcessor::processRecords() API even if
-		// GetRecords returned an empty record list.
-		CallProcessRecordsEvenForEmptyRecordList bool
+	// CallProcessRecordsEvenForEmptyRecordList Call the IRecordProcessor::processRecords() API even if
+	// GetRecords returned an empty record list.
+	CallProcessRecordsEvenForEmptyRecordList bool
 
-		// ParentShardPollIntervalMillis Wait for this long between polls to check if parent shards are done
-		ParentShardPollIntervalMillis int
+	// ParentShardPollIntervalMillis Wait for this long between polls to check if parent shards are done
+	ParentShardPollIntervalMillis int
 
-		// ShardSyncIntervalMillis Time between tasks to sync leases and Kinesis shards
-		ShardSyncIntervalMillis int
+	// ShardSyncIntervalMillis Time between tasks to sync leases and Kinesis shards
+	ShardSyncIntervalMillis int
 
-		// CleanupTerminatedShardsBeforeExpiry Clean up shards we've finished processing (don't wait for expiration)
-		CleanupTerminatedShardsBeforeExpiry bool
+	// CleanupTerminatedShardsBeforeExpiry Clean up shards we've finished processing (don't wait for expiration)
+	CleanupTerminatedShardsBeforeExpiry bool
 
-		// kinesisClientConfig Client Configuration used by Kinesis client
-		// dynamoDBClientConfig Client Configuration used by DynamoDB client
-		// cloudWatchClientConfig Client Configuration used by CloudWatch client
-		// Note: we will use default client provided by AWS SDK
+	// kinesisClientConfig Client Configuration used by Kinesis client
+	// dynamoDBClientConfig Client Configuration used by DynamoDB client
+	// cloudWatchClientConfig Client Configuration used by CloudWatch client
+	// Note: we will use default client provided by AWS SDK
 
-		// TaskBackoffTimeMillis Backoff period when tasks encounter an exception
-		TaskBackoffTimeMillis int
+	// TaskBackoffTimeMillis Backoff period when tasks encounter an exception
+	TaskBackoffTimeMillis int
 
-		// MetricsBufferTimeMillis Metrics are buffered for at most this long before publishing to CloudWatch
-		MetricsBufferTimeMillis int
+	// MetricsBufferTimeMillis Metrics are buffered for at most this long before publishing to CloudWatch
+	MetricsBufferTimeMillis int
 
-		// MetricsMaxQueueSize Max number of metrics to buffer before publishing to CloudWatch
-		MetricsMaxQueueSize int
+	// MetricsMaxQueueSize Max number of metrics to buffer before publishing to CloudWatch
+	MetricsMaxQueueSize int
 
-		// ValidateSequenceNumberBeforeCheckpointing whether KCL should validate client provided sequence numbers
-		ValidateSequenceNumberBeforeCheckpointing bool
+	// ValidateSequenceNumberBeforeCheckpointing whether KCL should validate client provided sequence numbers
+	ValidateSequenceNumberBeforeCheckpointing bool
 
-		// RegionName The region name for the service
-		RegionName string
+	// RegionName The region name for the service
+	RegionName string
 
-		// ShutdownGraceMillis The number of milliseconds before graceful shutdown terminates forcefully
-		ShutdownGraceMillis int
+	// ShutdownGraceMillis The number of milliseconds before graceful shutdown terminates forcefully
+	ShutdownGraceMillis int
 
-		// Operation parameters
+	// Operation parameters
 
-		// Max leases this Worker can handle at a time
-		MaxLeasesForWorker int
+	// Max leases this Worker can handle at a time
+	MaxLeasesForWorker int
 
-		// Max leases to steal at one time (for load balancing)
-		MaxLeasesToStealAtOneTime int
+	// Max leases to steal at one time (for load balancing)
+	MaxLeasesToStealAtOneTime int
 
-		// Read capacity to provision when creating the lease table (dynamoDB).
-		InitialLeaseTableReadCapacity int
+	// Read capacity to provision when creating the lease table (dynamoDB).
+	InitialLeaseTableReadCapacity int
 
-		// Write capacity to provision when creating the lease table.
-		InitialLeaseTableWriteCapacity int
+	// Write capacity to provision when creating the lease table.
+	InitialLeaseTableWriteCapacity int
 
-		// Worker should skip syncing shards and leases at startup if leases are present
-		// This is useful for optimizing deployments to large fleets working on a stable stream.
-		SkipShardSyncAtWorkerInitializationIfLeasesExist bool
-	}
-)
+	// Worker should skip syncing shards and leases at startup if leases are present
+	// This is useful for optimizing deployments to large fleets working on a stable stream.
+	SkipShardSyncAtWorkerInitializationIfLeasesExist bool
+}
 
 var positionMap = map[InitialPositionInStream]*string{
 	LATEST:       aws.String("LATEST"),
@@ -285,7 +284,7 @@ func NewKinesisClientLibConfigWithCredentials(applicationName, streamName, regio
 	checkIsValueNotEmpty("RegionName", regionName)
 
 	if empty(workerID) {
-		workerID = utils.MustNewUUID()
+		workerID = uuid.Must(uuid.NewUUID()).String()
 	}
 
 	// populate the KCL configuration with default values

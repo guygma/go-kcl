@@ -2,11 +2,11 @@ package util
 
 import (
 	"fmt"
-	"github.com/awslabs/kinesis-aggregation/go/record"
 	"net/http"
 
 	"github.com/aws/aws-sdk-go/aws"
-	ks "github.com/aws/aws-sdk-go/service/kinesis"
+
+	"github.com/guygma/goKCL/record"
 )
 
 // ErrorCode is unified definition of numerical error codes

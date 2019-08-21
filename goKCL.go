@@ -2,7 +2,6 @@ package goKCL
 
 import (
 	"errors"
-	"github.com/awslabs/kinesis-aggregation/go/shard"
 	"sync"
 	"time"
 
@@ -13,40 +12,38 @@ import (
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
 
-	chk "github.com/guygma/goKCL/checkpoint"
-	"github.com/guygma/goKCL/config"
-	"github.com/guygma/goKCL/metrics"
-	par "github.com/guygma/goKCL/partition"
-	kcl "github.com/guygma/goKCL/record"
+	"github.com/guygma/goKCL/record"
+	"github.com/guygma/goKCL/shard"
+	"github.com/guygma/goKCL/util"
 )
 
-/**
- * Worker is the high level class that Kinesis applications use to start processing data. It initializes and oversees
- * different components (e.g. syncing shard and lease information, tracking shard assignments, and processing data from
- * the shards).
- */
+//TODO: Determine if any of these fields need to be exported (capitalized).
+// High level struct that governs KCL execution.
 type Worker struct {
 	streamName string
 	regionName string
 	workerID   string
 
-	processorFactory kcl.IRecordProcessorFactory
-	kclConfig        *config.KinesisClientLibConfiguration
+	processorFactory record.IRecordProcessorFactory
+	kclConfig        *KinesisClientLibConfiguration
 	kc               kinesisiface.KinesisAPI
-	checkpointer     chk.Checkpointer
+	checkpointer     shard.Checkpointer
 
 	stop      *chan struct{}
 	waitGroup *sync.WaitGroup
 	done      bool
 
-	shardStatus map[string]*par.ShardStatus
+	shardStatus map[string]*shard.Status
 
-	metricsConfig *metrics.MonitoringConfiguration
-	mService      metrics.MonitoringService
+	metricsConfig *util.MonitoringConfiguration
+	mService      util.MonitoringService
 }
 
 // NewWorker constructs a Worker instance for processing Kinesis stream data.
-func NewWorker(factory kcl.IRecordProcessorFactory, kclConfig *config.KinesisClientLibConfiguration, metricsConfig *metrics.MonitoringConfiguration) *Worker {
+//TODO: This should be a method on the Worker type named "New".
+func NewWorker(factory record.IRecordProcessorFactory,
+	kclConfig *KinesisClientLibConfiguration,
+	metricsConfig *util.MonitoringConfiguration) *Worker {
 	w := &Worker{
 		streamName:       kclConfig.StreamName,
 		regionName:       kclConfig.RegionName,
@@ -59,7 +56,7 @@ func NewWorker(factory kcl.IRecordProcessorFactory, kclConfig *config.KinesisCli
 
 	if w.metricsConfig == nil {
 		// "" means noop monitor service. i.e. not emitting any metrics.
-		w.metricsConfig = &metrics.MonitoringConfiguration{MonitoringService: ""}
+		w.metricsConfig = &util.MonitoringConfiguration{MonitoringService: ""}
 	}
 	return w
 }
@@ -72,7 +69,7 @@ func (w *Worker) WithKinesis(svc kinesisiface.KinesisAPI) *Worker {
 
 // WithCheckpointer is used to provide a custom checkpointer service for non-dynamodb implementation
 // or unit testing.
-func (w *Worker) WithCheckpointer(checker chk.Checkpointer) *Worker {
+func (w *Worker) WithCheckpointer(checker shard.Checkpointer) *Worker {
 	w.checkpointer = checker
 	return w
 }
@@ -99,7 +96,7 @@ func (w *Worker) Start() error {
 
 // Shutdown signals worker to shutdown. Worker will try initiating shutdown of all record processors.
 func (w *Worker) Shutdown() {
-	log.Info("Worker shutdown in requested.")
+	log.Info("Worker shutdown is requested.")
 
 	if w.done {
 		return
@@ -153,7 +150,7 @@ func (w *Worker) initialize() error {
 	// Create default dynamodb based checkpointer implementation
 	if w.checkpointer == nil {
 		log.Info("Creating DynamoDB based checkpointer")
-		w.checkpointer = chk.NewDynamoCheckpoint(w.kclConfig)
+		w.checkpointer = shard.NewDynamoCheckpoint(w.kclConfig)
 	} else {
 		log.Info("Use custom checkpointer implementation.")
 	}
@@ -170,7 +167,7 @@ func (w *Worker) initialize() error {
 		return err
 	}
 
-	w.shardStatus = make(map[string]*par.ShardStatus)
+	w.shardStatus = make(map[string]*shard.Status)
 
 	stopChan := make(chan struct{})
 	w.stop = &stopChan
@@ -184,8 +181,8 @@ func (w *Worker) initialize() error {
 }
 
 // newShardConsumer to create a shard consumer instance
-func (w *Worker) newShardConsumer(shard *par.ShardStatus) *shard.ShardConsumer {
-	return &shard.ShardConsumer{
+func (w *Worker) newShardConsumer(shard *shard.Status) *shard.Consumer {
+	s := &shard.Consumer{
 		streamName:      w.streamName,
 		shard:           shard,
 		kc:              w.kc,
@@ -198,6 +195,7 @@ func (w *Worker) newShardConsumer(shard *par.ShardStatus) *shard.ShardConsumer {
 		mService:        w.mService,
 		state:           shard.WAITING_ON_PARENT_SHARDS,
 	}
+	return s
 }
 
 // eventLoop
@@ -212,54 +210,54 @@ func (w *Worker) eventLoop() {
 
 		log.Infof("Found %d shards", len(w.shardStatus))
 
-		// Count the number of leases hold by this worker excluding the processed shard
+		// Count the number of leases hold by this worker excluding the processed sh
 		counter := 0
-		for _, shard := range w.shardStatus {
-			if shard.GetLeaseOwner() == w.workerID && shard.Checkpoint != chk.SHARD_END {
+		for _, sh := range w.shardStatus {
+			if sh.GetLeaseOwner() == w.workerID && sh.Checkpoint != shard.SHARD_END {
 				counter++
 			}
 		}
 
 		// max number of lease has not been reached yet
 		if counter < w.kclConfig.MaxLeasesForWorker {
-			for _, shard := range w.shardStatus {
-				// already owner of the shard
-				if shard.GetLeaseOwner() == w.workerID {
+			for _, sh := range w.shardStatus {
+				// already owner of the sh
+				if sh.GetLeaseOwner() == w.workerID {
 					continue
 				}
 
-				err := w.checkpointer.FetchCheckpoint(shard)
+				err := w.checkpointer.FetchCheckpoint(sh)
 				if err != nil {
 					// checkpoint may not existed yet is not an error condition.
-					if err != chk.ErrSequenceIDNotFound {
+					if err != shard.ErrSequenceIDNotFound {
 						log.Errorf(" Error: %+v", err)
-						// move on to next shard
+						// move on to next sh
 						continue
 					}
 				}
 
-				// The shard is closed and we have processed all record
-				if shard.Checkpoint == chk.SHARD_END {
+				// The sh is closed and we have processed all record
+				if sh.Checkpoint == shard.SHARD_END {
 					continue
 				}
 
-				err = w.checkpointer.GetLease(shard, w.workerID)
+				err = w.checkpointer.GetLease(sh, w.workerID)
 				if err != nil {
-					// cannot get lease on the shard
-					if err.Error() != chk.ErrLeaseNotAquired {
+					// cannot get lease on the sh
+					if err.Error() != shard.ErrLeaseNotAquired {
 						log.Error(err)
 					}
 					continue
 				}
 
 				// log metrics on got lease
-				w.mService.LeaseGained(shard.ID)
+				w.mService.LeaseGained(sh.ID)
 
-				log.Infof("Start Shard Consumer for shard: %v", shard.ID)
-				sc := w.newShardConsumer(shard)
-				go sc.getRecords(shard)
+				log.Infof("Start Shard Consumer for sh: %v", sh.ID)
+				sc := w.newShardConsumer(sh)
+				go sc.GetRecords(sh) // Need to handle the error using a channel or rework the goroutine
 				w.waitGroup.Add(1)
-				// exit from for loop and not to grab more shard for now.
+				// exit from for loop and do not get any more shards for now.
 				break
 			}
 		}
@@ -304,7 +302,7 @@ func (w *Worker) getShardIDs(startShardID string, shardInfo map[string]bool) err
 		// found new shard
 		if _, ok := w.shardStatus[*s.ShardId]; !ok {
 			log.Infof("Found new shard with id %s", *s.ShardId)
-			w.shardStatus[*s.ShardId] = &par.ShardStatus{
+			w.shardStatus[*s.ShardId] = &shard.Status{
 				ID:                     *s.ShardId,
 				ParentShardId:          aws.StringValue(s.ParentShardId),
 				Mux:                    &sync.Mutex{},
@@ -335,15 +333,15 @@ func (w *Worker) syncShard() error {
 		return err
 	}
 
-	for _, shard := range w.shardStatus {
+	for _, sh := range w.shardStatus {
 		// The cached shard no longer existed, remove it.
-		if _, ok := shardInfo[shard.ID]; !ok {
+		if _, ok := shardInfo[sh.ID]; !ok {
 			// remove the shard from local status cache
-			delete(w.shardStatus, shard.ID)
+			delete(w.shardStatus, sh.ID)
 			// remove the shard entry in dynamoDB as well
 			// Note: syncShard runs periodically. we don't need to do anything in case of error here.
-			if err := w.checkpointer.RemoveLeaseInfo(shard.ID); err != nil {
-				log.Errorf("Failed to remove shard lease info: %s Error: %+v", shard.ID, err)
+			if err := w.checkpointer.RemoveLeaseInfo(sh.ID); err != nil {
+				log.Errorf("Failed to remove shard lease info: %s Error: %+v", sh.ID, err)
 			}
 		}
 	}

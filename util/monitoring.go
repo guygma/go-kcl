@@ -18,7 +18,6 @@ import (
 type MonitoringConfiguration struct {
 	MonitoringService string // Type of monitoring to expose. Supported types are "prometheus"
 	Region            string
-	Prometheus        PrometheusMonitoringService
 	CloudWatch        CloudWatchMonitoringService
 	service           MonitoringService
 }
@@ -44,12 +43,6 @@ func (m *MonitoringConfiguration) Init(nameSpace, streamName string, workerID st
 	}
 
 	switch m.MonitoringService {
-	case "prometheus":
-		m.Prometheus.Namespace = nameSpace
-		m.Prometheus.KinesisStream = streamName
-		m.Prometheus.WorkerID = workerID
-		m.Prometheus.Region = m.Region
-		m.service = &m.Prometheus
 	case "cloudwatch":
 		m.CloudWatch.Namespace = nameSpace
 		m.CloudWatch.KinesisStream = streamName
