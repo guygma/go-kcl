@@ -1,4 +1,4 @@
-package config
+package goKCL
 
 import (
 	"log"
@@ -6,10 +6,9 @@ import (
 	"strings"
 	"time"
 
-
-	"github.com/guygma/goKCL/utils"
 	"github.com/aws/aws-sdk-go/aws"
 	creds "github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/guygma/goKCL/utils"
 )
 
 const (
@@ -258,7 +257,6 @@ func checkIsValuePositive(key string, value int) {
 	}
 }
 
-
 func newInitialPositionAtTimestamp(timestamp *time.Time) *InitialPositionInStreamExtended {
 	return &InitialPositionInStreamExtended{Position: AT_TIMESTAMP, Timestamp: timestamp}
 }
@@ -266,7 +264,6 @@ func newInitialPositionAtTimestamp(timestamp *time.Time) *InitialPositionInStrea
 func newInitialPosition(position InitialPositionInStream) *InitialPositionInStreamExtended {
 	return &InitialPositionInStreamExtended{Position: position, Timestamp: nil}
 }
-
 
 // NewKinesisClientLibConfig to create a default KinesisClientLibConfiguration based on the required fields.
 func NewKinesisClientLibConfig(applicationName, streamName, regionName, workerID string) *KinesisClientLibConfiguration {

@@ -1,4 +1,4 @@
-module github.com/awslabs/kinesis-aggregation/go
+module github.com/guygma/goKCL
 
 require (
 	github.com/aws/aws-sdk-go v1.19.48

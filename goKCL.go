@@ -15,9 +15,9 @@ import (
 
 	chk "github.com/guygma/goKCL/checkpoint"
 	"github.com/guygma/goKCL/config"
-	kcl "github.com/guygma/goKCL/interfaces"
 	"github.com/guygma/goKCL/metrics"
 	par "github.com/guygma/goKCL/partition"
+	kcl "github.com/guygma/goKCL/record"
 )
 
 /**
